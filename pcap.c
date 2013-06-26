@@ -35,6 +35,9 @@ GHashTable  *flow_tbl;
 struct event_base *evbase;
 pcap_t *pcap_dest = NULL;
 int pcap_fd;
+const char *o_file_name = "/tmp/flow_data";
+
+FILE *fd = NULL;
 
 /*
  * initiate the globle variable flow_tbl
@@ -57,12 +60,18 @@ void hash_table_walk(GHashTable *ght)
     GList *flow_list = g_hash_table_get_values(ght);
     char ip_src[16];
 
+    /*
+     * there maybe 
+     *
+     */
+    rewind(fd);
+
     while (flow_list->next != NULL) {
         hash_node_t *d = flow_list->data;
         
         strcpy(ip_src, inet_ntoa(*(struct in_addr *)&d->src));
 
-        fprintf(stdout, "%s %s %d %d %d %d %lu %lu\n", 
+        fprintf(fd, "%s %s %d %d %d %d %lu %lu\n",
                     ip_src, inet_ntoa(*(struct in_addr *)&d->dst),
                     d->sport, d->dport,
                     d->p, d->tos,
@@ -75,7 +84,7 @@ void hash_table_walk(GHashTable *ght)
     
     strcpy(ip_src, inet_ntoa(*(struct in_addr *)&d->src));
 
-    fprintf(stdout, "%s %s %d %d %d %d %lu %lu\n", 
+    fprintf(fd, "%s %s %d %d %d %d %lu %lu\n",
                 ip_src,
                 inet_ntoa(*(struct in_addr *)&d->dst),
                 d->sport, d->dport,
@@ -83,6 +92,7 @@ void hash_table_walk(GHashTable *ght)
             );
  
 }
+
 /*
  * initiate a hash node structure and return the address for storing data
  *
@@ -326,6 +336,11 @@ int main(int argc, char **argv)
     struct event pcap_event;
     struct timeval tv;
 
+    if ((fd = fopen(o_file_name, "w")) == NULL) {
+        fprintf(stderr, "failed to open file for store data\n");
+        exit(EXIT_FAILURE);
+    }
+
     event_init();
 
     // timer
@@ -350,5 +365,6 @@ int main(int argc, char **argv)
 
     //printf("%d\n", g_hash_table_size(flow_tbl));
     //hash_table_walk(flow_tbl);
+    fclose(fd);
     return 0;
 }
