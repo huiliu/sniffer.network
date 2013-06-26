@@ -184,7 +184,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
                                                                 = header->len;
     
 /*
- * insert into the has table
+ * insert into the hash table
  *
  */
 
