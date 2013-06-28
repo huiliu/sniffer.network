@@ -1,3 +1,5 @@
+
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -5,11 +7,12 @@
 #include <pcap.h>
 #include <pcap-bpf.h>
 #include <net/ethernet.h>
+#include <arpa/inet.h>
 #include <netinet/ip.h>
+#define __FAVOR_BSD
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 
 #include <event.h>
 #include <glib.h>
@@ -168,15 +171,15 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
             //printf("\e\[31mTCP\e\[0m");
             tcp = (struct tcphdr *)(packet + ETHER_HDR_LEN + ip_h_size);
 
-            hash_node->sport = sport = ntohs(tcp->source);
-            hash_node->dport = dport = ntohs(tcp->dest);
+            hash_node->sport = sport = ntohs(tcp->th_sport);
+            hash_node->dport = dport = ntohs(tcp->th_dport);
             break;
         case IPPROTO_UDP:
             //printf("\e\[31mUDP\e\[0m");
             udp = (struct udphdr *)(packet + ETHER_HDR_LEN + ip_h_size);
 
-            hash_node->sport = sport = ntohs(udp->source);
-            hash_node->dport = dport = ntohs(udp->dest);
+            hash_node->sport = sport = ntohs(udp->uh_sport);
+            hash_node->dport = dport = ntohs(udp->uh_dport);
             break;
         case IPPROTO_ICMP:
             //printf("\e\[31mICMP\e\[0m %u\n", header->len);
