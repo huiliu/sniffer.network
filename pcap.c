@@ -60,9 +60,13 @@ void hash_table_init(void)
  */
 void hash_table_walk(GHashTable *ght)
 {
-    GList *flow_list = g_hash_table_get_values(ght);
+    GList *flow_list;
     char ip_src[16];
 
+    if((flow_list = g_hash_table_get_values(ght)) == NULL) {
+        fprintf(stderr, "Doesn't capture any packet!\n");
+        return;
+    }
     /*
      * there maybe 
      *
