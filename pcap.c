@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <syslog.h>
+#include <unistd.h>
 #include <pcap.h>
 #include <pcap-bpf.h>
 #include <net/ethernet.h>
@@ -18,8 +18,15 @@
 #include <glib.h>
 #include <time.h>
 
-#define SNAP_LEN    1518
+#define SNAP_LEN                1518
 #define OUTPUT_TIME_INTERVAL    5
+#define DEV_NAME_LEN            5
+#define BUFF_LEN                DEV_NAME_LEN
+
+#define USAGE(void)             printf("usage: %s <-d dev>\n", argv[0]);\
+                                exit(EXIT_FAILURE)
+#define MALLOC(fd, size)        if (((fd) = malloc(size)) == NULL) exit(EXIT_FAILURE)
+
 
 typedef struct __hash_node__ {
     uint32_t    src;            /* src ip */
@@ -33,7 +40,7 @@ typedef struct __hash_node__ {
     uint32_t     time;          /* timestamp of the lastest packet */
 }hash_node_t;
 
-
+char *dev = NULL;
 GHashTable  *flow_tbl;
 struct event_base *evbase;
 pcap_t *pcap_dest = NULL;
@@ -65,6 +72,7 @@ void hash_table_walk(GHashTable *ght)
 
     if((flow_list = g_hash_table_get_values(ght)) == NULL) {
         fprintf(stderr, "Doesn't capture any packet!\n");
+        g_list_free(flow_list);
         return;
     }
     /*
@@ -277,13 +285,15 @@ void ev_pkt_handler(int sock, short which, void *argv)
 
 void pcap_init(void)
 {
-    char *dev;
+    //char *dev;
     char err_buff[PCAP_ERRBUF_SIZE];
 
-    // 1. find the active interface for capturing data
-    if ((dev = pcap_lookupdev(err_buff)) == NULL) {
-        fprintf(stderr, "Couldn't find default device: %s\n", err_buff);
-        exit(EXIT_FAILURE);
+    if (dev == NULL) {
+        // 1. find the active interface for capturing data
+        if ((dev = pcap_lookupdev(err_buff)) == NULL) {
+            fprintf(stderr, "Couldn't find default device: %s\n", err_buff);
+            exit(EXIT_FAILURE);
+        }
     }
 
     // 2. open the interface
@@ -328,8 +338,34 @@ void pcap_init(void)
     }
 }
 
+void
+parse_cmd(int argc, char **argv)
+{
+    int opt;
+    if (argc == 1) {
+        USAGE();
+    }
+
+    while ((opt = getopt(argc, argv, "d:h")) != -1) {
+        switch (opt) {
+            case 'd':
+                MALLOC(dev, sizeof(char) * DEV_NAME_LEN);
+                strcpy(dev, optarg);
+                break;
+            case 'h':
+                USAGE();
+                break;
+            default:
+                USAGE();
+        }
+    }
+
+}
+
 int main(int argc, char **argv)
 {
+
+    parse_cmd(argc, argv);
     //evbase = event_base_new();
     hash_table_init();
 
