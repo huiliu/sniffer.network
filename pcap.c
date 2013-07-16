@@ -132,31 +132,16 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     const struct ip             *ip;
     const struct tcphdr         *tcp;
     const struct udphdr         *udp;
-    hash_node_t     *hash_node,
-                    *hn_ip_up,
-                    *hn_ip_down;
+    hash_node_t     *hash_node;
     uint16_t        sport,
                     dport;
     char            buff[46],
-                    ip_src[16];
-    const char      *up = "out",
-                    *down = "in";
+                    ip_src[16],
+                    ip_dst[16];
 
     hash_node = hash_node_init();
-    hn_ip_up = hash_node_init();
-    hn_ip_down = hash_node_init();
 
     ethernet = (struct ether_header *)packet;
-    /*
-    printf("SRC MAC: %X:%X:%X:%X:%X:%X, DST MAC: %X:%X:%X:%X:%X:%X\n",
-                ethernet->ether_shost[0], ethernet->ether_shost[1], 
-                ethernet->ether_shost[2], ethernet->ether_shost[3], 
-                ethernet->ether_shost[4], ethernet->ether_shost[5], 
-                ethernet->ether_dhost[0], ethernet->ether_dhost[1], 
-                ethernet->ether_dhost[2], ethernet->ether_dhost[3], 
-                ethernet->ether_dhost[4], ethernet->ether_dhost[5]
-            );
-    */
 
     ip = (struct ip*)(packet + ETHER_HDR_LEN);
     size_t ip_h_size = ip->ip_hl * 4;
@@ -166,12 +151,13 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
         return;
     }
 
-    hn_ip_up->src = hash_node->src = ip->ip_src.s_addr;
-    hn_ip_down->dst = hash_node->dst = ip->ip_dst.s_addr;
+    hash_node->src = ip->ip_src.s_addr;
+    hash_node->dst = ip->ip_dst.s_addr;
     hash_node->p = ip->ip_p;
     hash_node->tos = ip->ip_tos;
 
     strcpy(ip_src, inet_ntoa(ip->ip_src));
+    strcpy(ip_dst, inet_ntoa(ip->ip_dst));
 
     /*
     printf("SRC IP: %s\n", ip_src);
@@ -204,9 +190,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     }
 
     hash_node->pkt_count++;
-    hn_ip_down->pkt_count = hn_ip_up->pkt_count = hash_node->pkt_count;
-    hn_ip_down->flow_count = hn_ip_up->flow_count = hash_node->flow_count
-                                                                = header->len;
+    hash_node->flow_count = header->len;
     
 /*
  * insert into the hash table
@@ -216,35 +200,51 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     hash_node_t *hn = NULL;
     char *key = NULL;
 
-    /* statistics information */ 
+/*
+    const char      *up = "out",
+                    *down = "in";
+    hash_node_t     *hn_ip_up,
+                    *hn_ip_down;
+
+    // statistics information 
     // up trafic
     key = strcat(ip_src, up);
     if ((hn = g_hash_table_lookup(flow_tbl, key)) != NULL) {
         hn->pkt_count++;
         hn->flow_count += header->len;
-        free(hn_ip_up);
-    }else
+    }else{
+        hn_ip_up = hash_node_init();
+
+        hn_ip_up->src = ip->ip_src.s_addr;
+        hn_ip_up->pkt_count++;
+        hn_ip_up->flow_count = header->len;
+
         g_hash_table_insert(flow_tbl, key, hn_ip_up);
+    }
 
     // down trafic
-    hn = NULL;
     key = strcat(inet_ntoa(ip->ip_dst), down);
     if ((hn = g_hash_table_lookup(flow_tbl, key)) != NULL) {
         hn->pkt_count++;
         hn->flow_count += header->len;
-        free(hn_ip_down);
-    }else
-        g_hash_table_insert(flow_tbl, key, hn_ip_down);
+    }else{
+        hn_ip_down = hash_node_init();
 
-    hn = NULL;
+        hn_ip_down->dst = ip->ip_dst.s_addr; 
+        hn_ip_down->pkt_count++;
+        hn_ip_down->flow_count = header->len;
+
+        g_hash_table_insert(flow_tbl, key, hn_ip_down);
+    }
+*/
     /* hash key */
     sprintf(buff, "%s%s%d%d%d",ip_src, inet_ntoa(ip->ip_dst),
                                                         ip->ip_p, sport, dport);
     if ((hn = g_hash_table_lookup(flow_tbl, buff)) != NULL) {
         /* connetion information */
+        free(hash_node);
         hn->pkt_count++;
         hn->flow_count += header->len;
-        free(hash_node);
     }else
         /* new connetion information */
         g_hash_table_insert(flow_tbl, buff, hash_node);
