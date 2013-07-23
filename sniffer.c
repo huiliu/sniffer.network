@@ -49,9 +49,9 @@ list_walk(list_node_t *h)
     char ip_src[16];
 
 #if defined(__x86_64__)
-    char *fmt = "%s %s %d %d %lu %lu\n";
+    char *fmt = "%s %s %d %d %lu %lu %lu\n";
 #else
-    char *fmt = "%s %s %d %d %llu %llu\n";
+    char *fmt = "%s %s %d %d %llu %llu %llu\n";
 #endif
 
     rewind(fd);
@@ -62,7 +62,7 @@ list_walk(list_node_t *h)
         fprintf(fd, fmt,
                     ip_src, inet_ntoa(*(struct in_addr *)&l->dst),
                     l->sport, l->dport,
-                    l->pkt_count, l->flow_count);
+                    l->pkt_count, l->flow_count, l->time);
         l = l->next;
     }
 
@@ -70,7 +70,7 @@ list_walk(list_node_t *h)
     fprintf(fd, fmt,
                     ip_src, inet_ntoa(*(struct in_addr *)&l->dst),
                     l->sport, l->dport,
-                    l->pkt_count, l->flow_count);
+                    l->pkt_count, l->flow_count, l->time);
 }
 
 void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
@@ -86,6 +86,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
                     ip_dst[16];
 
     node = malloc(sizeof(list_node_t));
+    node->time = time(NULL);
 
     ethernet = (struct ether_header *)packet;
 

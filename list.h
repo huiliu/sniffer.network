@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <net/ethernet.h>
 #include <arpa/inet.h>
 #include <netinet/ip.h>
@@ -21,7 +22,7 @@ typedef struct __list_node__ {
     uint8_t     tos;            /* type of server for ip head */
     uint64_t    pkt_count;      /* packet count */
     uint64_t    flow_count;     /* flow count by bytes */
-    uint32_t    time;          /* timestamp of the lastest packet */
+    time_t      time;          /* timestamp of the lastest packet */
     struct __list_node__ *next;
 }list_node_t;
 
