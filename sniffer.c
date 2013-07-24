@@ -17,18 +17,10 @@
 #include <event.h>
 #include <time.h>
 
-#include "list.h"
+#include "sniffer.h"
 
-#define SNAP_LEN                1518
-#define OUTPUT_TIME_INTERVAL    60
-#define DEV_NAME_LEN            5
-#define BUFF_LEN                DEV_NAME_LEN
-
-#define USAGE(void)             printf("usage: %s <-d dev> <-i interval>\n", argv[0]);\
-                                exit(EXIT_FAILURE)
-#define MALLOC(fd, size)        if (((fd) = malloc(size)) == NULL) exit(EXIT_FAILURE)
-
-list_t  *plist = NULL;
+list_node_t  packet_list[PACKET_MAX_COUNT];
+uint32_t packet_list_len = 0;
 pcap_t *pcap_dest = NULL;
 int pcap_fd;
 struct event_base *evbase;
@@ -53,47 +45,38 @@ char
 }
 
 void
-list_walk(list_t *list)
+list_walk()
 {
-    list_node_t *l = list->head;
 
-    if (l->next == NULL)
+    if (fd == NULL)
     {
-        fprintf(stderr, "Doesn't capture any packet!\n");
-        return;
+        fprintf(stderr, "invalidate file handle.[output]\n");
+        exit(EXIT_FAILURE);
     }
-
-    char ip_src[16];
-
 #if defined(__x86_64__)
     char *fmt = "%s %s %d %d %lu %lu %lu\n";
 #else
-    char *fmt = "%s %s %d %d %llu %llu %llu\n";
+    char *fmt = "%s %s %d %d %llu %llu %lu\n";
 #endif
 
-    rewind(fd);
+    char ip_src[16];
+    list_node_t *l = packet_list;
+    uint32_t i;
 
-    while(l->next != NULL)
+    for (i = 0; i < packet_list_len; i++)
     {
         strcpy(ip_src, inet_ntoa(*(struct in_addr *)&l->src));
         fprintf(fd, fmt,
                     ip_src, inet_ntoa(*(struct in_addr *)&l->dst),
                     l->sport, l->dport,
                     l->pkt_count, l->flow_count, l->time);
-        list_node_t *tmp = l;
-        l = l->next;
-        free(tmp);
+        l++;
     }
-
-    strcpy(ip_src, inet_ntoa(*(struct in_addr *)&l->src));
-    fprintf(fd, fmt,
-                    ip_src, inet_ntoa(*(struct in_addr *)&l->dst),
-                    l->sport, l->dport,
-                    l->pkt_count, l->flow_count, l->time);
-    free(l);
+    packet_list_len = 0;
 }
 
-void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
+void got_packet(u_char *args, const struct pcap_pkthdr *header,
+                                                        const u_char *packet)
 {
     const struct ether_header   *ethernet;
     const struct ip             *ip;
@@ -105,11 +88,16 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     char            ip_src[16],
                     ip_dst[16];
 
-    if((node = malloc(sizeof(list_node_t))) == NULL)
+    
+    if (packet_list_len >= PACKET_MAX_COUNT)
     {
-        fprintf(stderr, "Failed to allocate memory for node!\n");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "The count of packets exceed %d, Packets will be drop\n",
+                                                            PACKET_MAX_COUNT);
+        return;
     }
+
+    node = packet_list + packet_list_len;
+    packet_list_len++;
     node->time = time(NULL);
 
     ethernet = (struct ether_header *)packet;
@@ -162,8 +150,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 
     node->pkt_count++;
     node->flow_count = header->len;
-
-    list_insert(plist, node);
 }
 
 /*
@@ -179,7 +165,7 @@ void ev_time_handle(int fdd, short event, void *argv)
         exit(EXIT_FAILURE);
     }
 
-    list_walk(plist);
+    list_walk();
     fclose(fd);
 
     o_file_name = generate_file_name();
@@ -292,7 +278,6 @@ int main(int argc, char **argv)
 
     parse_cmd(argc, argv);
     //evbase = event_base_new();
-    plist = list_init(plist);
 
     pcap_init();
 
