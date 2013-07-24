@@ -20,32 +20,49 @@
 #include "list.h"
 
 #define SNAP_LEN                1518
-#define OUTPUT_TIME_INTERVAL    5
+#define OUTPUT_TIME_INTERVAL    60
 #define DEV_NAME_LEN            5
 #define BUFF_LEN                DEV_NAME_LEN
 
-#define USAGE(void)             printf("usage: %s <-d dev>\n", argv[0]);\
+#define USAGE(void)             printf("usage: %s <-d dev> <-i interval>\n", argv[0]);\
                                 exit(EXIT_FAILURE)
 #define MALLOC(fd, size)        if (((fd) = malloc(size)) == NULL) exit(EXIT_FAILURE)
 
-list_node_t *head = NULL;
+list_t  *plist = NULL;
 pcap_t *pcap_dest = NULL;
 int pcap_fd;
 struct event_base *evbase;
-const char *o_file_name = "/tmp/flow_data";
+char *o_file_name = NULL;
 char *dev = NULL;
 FILE *fd = NULL;
+uint16_t    interval = 0;
+
+char
+*generate_file_name()
+{
+    void *buff;
+
+    if ((buff = malloc(sizeof(char))) == NULL)
+    {
+        fprintf(stderr, "failed to allocate memory!\n");
+        exit(EXIT_FAILURE);
+    }
+    time_t t = time(NULL);
+    strftime(buff, 20, "packet_%Y%m%d%H%M", localtime(&t));
+    return buff;
+}
 
 void
-list_walk(list_node_t *h)
+list_walk(list_t *list)
 {
-    if (h->next == NULL)
+    list_node_t *l = list->head;
+
+    if (l->next == NULL)
     {
         fprintf(stderr, "Doesn't capture any packet!\n");
         return;
     }
 
-    list_node_t *l = h->next;
     char ip_src[16];
 
 #if defined(__x86_64__)
@@ -63,7 +80,9 @@ list_walk(list_node_t *h)
                     ip_src, inet_ntoa(*(struct in_addr *)&l->dst),
                     l->sport, l->dport,
                     l->pkt_count, l->flow_count, l->time);
+        list_node_t *tmp = l;
         l = l->next;
+        free(tmp);
     }
 
     strcpy(ip_src, inet_ntoa(*(struct in_addr *)&l->src));
@@ -71,6 +90,7 @@ list_walk(list_node_t *h)
                     ip_src, inet_ntoa(*(struct in_addr *)&l->dst),
                     l->sport, l->dport,
                     l->pkt_count, l->flow_count, l->time);
+    free(l);
 }
 
 void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
@@ -85,7 +105,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     char            ip_src[16],
                     ip_dst[16];
 
-    node = malloc(sizeof(list_node_t));
+    if((node = malloc(sizeof(list_node_t))) == NULL)
+    {
+        fprintf(stderr, "Failed to allocate memory for node!\n");
+        exit(EXIT_FAILURE);
+    }
     node->time = time(NULL);
 
     ethernet = (struct ether_header *)packet;
@@ -139,16 +163,30 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     node->pkt_count++;
     node->flow_count = header->len;
 
-    list_insert(head, node);
+    list_insert(plist, node);
 }
 
 /*
  * event timer handle use to output data
  * 
  */
-void ev_time_handle(int fd, short event, void *argv)
+void ev_time_handle(int fdd, short event, void *argv)
 {
-    list_walk(head);
+
+    if(fflush(fd) != 0)
+    {
+        fprintf(stderr, "failed to open file for store data\n");
+        exit(EXIT_FAILURE);
+    }
+
+    list_walk(plist);
+    fclose(fd);
+
+    o_file_name = generate_file_name();
+    if ((fd = fopen(o_file_name, "w")) == NULL) {
+        fprintf(stderr, "failed to open file for store data\n");
+        exit(EXIT_FAILURE);
+    }
 
     struct event *evtime = argv;
     struct timeval tv;
@@ -230,11 +268,14 @@ parse_cmd(int argc, char **argv)
         USAGE();
     }
 
-    while ((opt = getopt(argc, argv, "d:h")) != -1) {
+    while ((opt = getopt(argc, argv, "d:i:h")) != -1) {
         switch (opt) {
             case 'd':
                 MALLOC(dev, sizeof(char) * DEV_NAME_LEN);
                 strcpy(dev, optarg);
+                break;
+            case 'i':
+                interval = atoi(optarg);
                 break;
             case 'h':
                 USAGE();
@@ -251,7 +292,7 @@ int main(int argc, char **argv)
 
     parse_cmd(argc, argv);
     //evbase = event_base_new();
-    head = list_init();
+    plist = list_init(plist);
 
     pcap_init();
 
@@ -263,6 +304,7 @@ int main(int argc, char **argv)
     struct event pcap_event;
     struct timeval tv;
 
+    o_file_name = generate_file_name();
     if ((fd = fopen(o_file_name, "w")) == NULL) {
         fprintf(stderr, "failed to open file for store data\n");
         exit(EXIT_FAILURE);
@@ -273,7 +315,7 @@ int main(int argc, char **argv)
     // timer
     evtimer_set(&evtime, ev_time_handle, &evtime);
     evutil_timerclear(&tv);
-    tv.tv_sec = OUTPUT_TIME_INTERVAL;
+    tv.tv_sec = interval;
     event_add(&evtime, &tv);
 
     // registe event for capture packet

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <time.h>
 #include <net/ethernet.h>
 #include <arpa/inet.h>
@@ -26,10 +27,14 @@ typedef struct __list_node__ {
     struct __list_node__ *next;
 }list_node_t;
 
+typedef struct __list__ {
+    list_node_t *head;
+    list_node_t *tail;
+}list_t;
 
-list_node_t *list_init();
+list_t * list_init(list_t *);
 void * list_search(list_node_t *, list_node_t *);
-void list_insert(list_node_t *, list_node_t *);
-void list_destory(list_node_t *);
+void list_insert(list_t *, list_node_t *);
+void list_destory(list_t *);
 
 #endif

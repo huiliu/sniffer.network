@@ -1,18 +1,29 @@
 #include "list.h"
 
-list_node_t
-*list_init()
+list_t
+*list_init(list_t *list)
 {
-    list_node_t     *head;
-
-    head = malloc(sizeof(list_node_t));
-    if (head == NULL)
+    list_t *plist = NULL;
+    if ((plist = malloc(sizeof(list_t))) == NULL)
     {
         fprintf(stderr, "Failed to create the list.\n");
         exit(EXIT_FAILURE);
     }
-    head->next = NULL;
-    return head;
+
+    plist->head = malloc(sizeof(list_node_t));
+    if (plist->head == NULL)
+    {
+        fprintf(stderr, "Failed to create the head of list.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    plist->head->next = NULL;
+    plist->tail = plist->head;
+
+    if (list != NULL)
+        free(list);
+    list = plist;
+    return plist;
 }
 
 void
@@ -40,34 +51,21 @@ void
 }
 
 void
-list_insert(list_node_t *h, list_node_t *v)
+list_insert(list_t *l, list_node_t *v)
 {
-    list_node_t *ret = list_search(h, v);
-    if (ret->next != NULL && ret->src == v->src &&
-                             ret->dst == v->dst &&
-                             ret->sport == v->sport &&
-                             ret->dport == v->dport)
-    {
-        ret->pkt_count += v->pkt_count;
-        ret->flow_count += v->flow_count;
-        ret->time = v->time;
-        free(v);
-    }else{
-        ret->next = v;
-        v->next = NULL;
-    }
+    l->tail->next = v;
+    l->tail = v;
 }
 
 void
-list_destory(list_node_t *h)
+list_destory(list_t *l)
 {
-    list_node_t *l = h->next;
     list_node_t *tmp;
-    while (l->next != NULL)
+    while (l->head->next != NULL)
     {
-        tmp = l;
-        l = l->next;
+        tmp = l->head;
+        l->head = tmp->next;
         free(tmp);
     }
-    free(l);
+    free(l->head);
 }
