@@ -6,3 +6,6 @@ pcap: pcap.c
 
 clean:
 	rm -rf pcap
+
+sniffer: sniffer.c sniffer.h
+	cc -levent -lpcap sniffer.c -o sniffer

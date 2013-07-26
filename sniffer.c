@@ -19,7 +19,7 @@
 
 #include "sniffer.h"
 
-#define OUTPUT_FILE_NAME_LEN        50
+#define OUTPUT_FILE_NAME_LEN        20
 
 list_node_t  packet_list[PACKET_MAX_COUNT];
 uint32_t packet_list_len = 0;
@@ -30,8 +30,13 @@ char *o_file_name = NULL;
 char *dev = NULL;
 FILE *fd = NULL;
 uint16_t    interval = 0;
+char file_summary_01[20] = "125.77.254.2";;
+char file_summary_02[20] = "125.77.254.3";;
 
-char
+char *ip_01 = "125.77.254.2";
+char *ip_02 = "125.77.254.2";
+
+inline char
 *generate_file_name()
 {
     void *buff;
@@ -49,6 +54,9 @@ char
 void
 list_walk()
 {
+    ip_traffic ip_traf[2];
+    inet_aton(ip_01, (struct in_addr *)&ip_traf->ip);
+    inet_aton(ip_02, (struct in_addr *)&ip_traf[1].ip);
 
     if (fd == NULL)
     {
@@ -57,8 +65,10 @@ list_walk()
     }
 #if defined(__x86_64__)
     char *fmt = "%s %s %d %d %lu %lu %lu\n";
+    char *fmt_sum = "%s %lu %lu %lu %lu\n";
 #else
     char *fmt = "%s %s %d %d %llu %llu %lu\n";
+    char *fmt_sum = "%s %llu %llu %llu %llu\n";
 #endif
 
     char ip_src[16];
@@ -67,6 +77,24 @@ list_walk()
 
     for (i = 0; i < packet_list_len; i++)
     {
+        if (l->src == ip_traf[0].ip)
+        {
+            ip_traf[0].pkt_out += l->pkt_count;
+            ip_traf[0].flow_out += l->flow_count;
+        }else if(l->dst == ip_traf[0].ip)
+        {
+            ip_traf[0].pkt_in += l->pkt_count;
+            ip_traf[0].flow_in += l->flow_count;
+        }else if (l->src == ip_traf[1].ip)
+        {
+            ip_traf[1].pkt_out += l->pkt_count;
+            ip_traf[1].flow_out += l->flow_count;
+        }else if(l->dst == ip_traf[1].ip)
+        {
+            ip_traf[1].pkt_in += l->pkt_count;
+            ip_traf[1].flow_in += l->flow_count;
+        }
+
         strcpy(ip_src, inet_ntoa(*(struct in_addr *)&l->src));
         fprintf(fd, fmt,
                     ip_src, inet_ntoa(*(struct in_addr *)&l->dst),
@@ -74,6 +102,27 @@ list_walk()
                     l->pkt_count, l->flow_count, l->time);
         l++;
     }
+
+    char time_stamp[20];
+
+    time_t t = time(NULL);
+    strftime(time_stamp, OUTPUT_FILE_NAME_LEN, "packet_%Y%m%d%H%M", localtime(&t));
+
+    FILE *tmp = NULL;
+    tmp = fopen(file_summary_01, "a");
+    fprintf(tmp, fmt_sum, inet_ntoa(*(struct in_addr *)&ip_traf[0].ip),
+                ip_traf->pkt_in, ip_traf->pkt_out,
+                ip_traf->flow_in, ip_traf->flow_out,
+                time_stamp);
+    fclose(tmp);
+
+    tmp = fopen(file_summary_02, "a");
+    fprintf(tmp, fmt_sum, inet_ntoa(*(struct in_addr *)&ip_traf[1].ip),
+                ip_traf[1].pkt_in, ip_traf[1].pkt_out,
+                ip_traf[1].flow_in, ip_traf[1].flow_out,
+                time_stamp);
+    fclose(tmp);
+
     packet_list_len = 0;
 }
 
@@ -180,7 +229,12 @@ void ev_time_handle(int fdd, short event, void *argv)
     struct timeval tv;
 
     evutil_timerclear(&tv);
-    tv.tv_sec = OUTPUT_TIME_INTERVAL;
+
+    if (! interval)
+        tv.tv_sec = OUTPUT_TIME_INTERVAL;
+    else
+        tv.tv_sec = interval;
+
     event_add(evtime, &tv);
 }
 
@@ -264,6 +318,7 @@ parse_cmd(int argc, char **argv)
                 break;
             case 'i':
                 interval = atoi(optarg);
+                fprintf(stdout, "interval: %d\n", interval);
                 break;
             case 'h':
                 USAGE();

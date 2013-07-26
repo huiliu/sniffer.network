@@ -9,7 +9,8 @@
 #include <time.h>
 
 
-typedef struct __list_node__ {
+typedef struct __list_node__
+{
     uint32_t    src;            /* src ip */
     uint32_t    dst;            /* dest ip */
     uint16_t    sport;          /* src port */
@@ -22,6 +23,15 @@ typedef struct __list_node__ {
     struct __list_node__ *next;
 }list_node_t;
 
+typedef struct __ip_sum__
+{
+    uint32_t    ip;
+    uint64_t    pkt_in;
+    uint64_t    pkt_out;
+    uint64_t    flow_in;
+    uint64_t    flow_out;
+}ip_traffic;
+
 #define SNAP_LEN                1518
 #define OUTPUT_TIME_INTERVAL    60
 #define DEV_NAME_LEN            5
@@ -31,7 +41,5 @@ typedef struct __list_node__ {
 #define USAGE(void)             printf("usage: %s <-d dev> <-i interval>\n", argv[0]);\
                                 exit(EXIT_FAILURE)
 #define MALLOC(fd, size)        if (((fd) = malloc(size)) == NULL) exit(EXIT_FAILURE)
-
-
 
 #endif
