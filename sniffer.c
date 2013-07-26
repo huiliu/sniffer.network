@@ -19,6 +19,8 @@
 
 #include "sniffer.h"
 
+#define OUTPUT_FILE_NAME_LEN        50
+
 list_node_t  packet_list[PACKET_MAX_COUNT];
 uint32_t packet_list_len = 0;
 pcap_t *pcap_dest = NULL;
@@ -34,13 +36,13 @@ char
 {
     void *buff;
 
-    if ((buff = malloc(sizeof(char))) == NULL)
+    if ((buff = malloc(sizeof(char) * OUTPUT_FILE_NAME_LEN)) == NULL)
     {
         fprintf(stderr, "failed to allocate memory!\n");
         exit(EXIT_FAILURE);
     }
     time_t t = time(NULL);
-    strftime(buff, 20, "packet_%Y%m%d%H%M", localtime(&t));
+    strftime(buff, OUTPUT_FILE_NAME_LEN, "packet_%Y%m%d%H%M", localtime(&t));
     return buff;
 }
 
