@@ -52,6 +52,33 @@ inline char
 }
 
 void
+packet_insert(list_node_t *node)
+{
+    uint32_t i;
+    list_node_t *head = packet_list;
+
+    for (i = 0; i < packet_list_len; i++)
+    {
+        if (head->src == node->src && head->dst == node->dst &&
+                    head->sport == node->sport && head->dport == node->dport)
+        {
+            head->pkt_count += node->pkt_count;
+            head->flow_count += node->flow_count;
+            head->time = node->time;
+            break;
+        }
+        head++;
+    }
+
+    if (i == packet_list_len)
+    {
+        memcpy((packet_list + packet_list_len), node, sizeof(list_node_t));
+        packet_list_len++;
+    }else if (i > packet_list_len)
+        fprintf(stderr, "Failed to insert packet information into the list!\n");
+}
+
+void
 list_walk()
 {
     ip_traffic ip_traf[2];
@@ -133,7 +160,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
     const struct ip             *ip;
     const struct tcphdr         *tcp;
     const struct udphdr         *udp;
-    list_node_t     *node;
+    list_node_t     temp;
+    list_node_t     *node = &temp;
     uint16_t        sport,
                     dport;
     char            ip_src[16],
@@ -147,8 +175,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
         return;
     }
 
+/*
     node = packet_list + packet_list_len;
     packet_list_len++;
+*/
     node->time = time(NULL);
 
     ethernet = (struct ether_header *)packet;
@@ -199,8 +229,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
             dport = 0;
     }
 
-    node->pkt_count++;
+    node->pkt_count = 1;
     node->flow_count = header->len;
+
+    packet_insert(node);
 }
 
 /*
@@ -263,7 +295,7 @@ void pcap_init(void)
     // 2. open the interface
     bpf_u_int32 net, mask;
 
-    if ((pcap_dest = pcap_open_live(dev, SNAP_LEN, 0, 1000, err_buff)) == NULL){
+    if ((pcap_dest = pcap_open_live(dev, SNAP_LEN, 1, 1000, err_buff)) == NULL){
         fprintf(stderr, "Failed to open the device %s\n", dev);
         exit(EXIT_FAILURE);
     }
