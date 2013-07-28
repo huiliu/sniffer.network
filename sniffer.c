@@ -20,6 +20,7 @@
 #include "sniffer.h"
 
 #define OUTPUT_FILE_NAME_LEN        20
+#define PACKET_READ_BUFF            1024*1024
 
 list_node_t  packet_list[PACKET_MAX_COUNT];
 uint32_t packet_list_len = 0;
@@ -295,19 +296,38 @@ void pcap_init(void)
     // 2. open the interface
     bpf_u_int32 net, mask;
 
-    if ((pcap_dest = pcap_open_live(dev, SNAP_LEN, 1, 1000, err_buff)) == NULL){
+    
+    if ((pcap_dest = pcap_create(dev, err_buff)) == NULL){
         fprintf(stderr, "Failed to open the device %s\n", dev);
         exit(EXIT_FAILURE);
     }
 
-    if (pcap_lookupnet(dev, &net, &mask, err_buff) == -1) {
-        fprintf(stderr, "Failed to get net.\n");
+    pcap_set_snaplen(pcap_dest, SNAP_LEN);
+    pcap_set_timeout(pcap_dest, 1000);
+    pcap_set_promisc(pcap_dest, 1);
+    pcap_set_buffer_size(pcap_dest, PACKET_READ_BUFF);
+
+    if (pcap_activate(pcap_dest) != 0)
+    {
+        pcap_perror(pcap_dest, "[Error]: ");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pcap_datalink(pcap_dest) != DLT_EN10MB)
+    {
+        fprintf(stderr, "This program just could handle the Ethernet data.\n");
         exit(EXIT_FAILURE);
     }
 
     // 3. complie the filter
     char filter[] = "ip";
     struct bpf_program fp;
+
+    if (pcap_lookupnet(dev, &net, &mask, err_buff) == -1) {
+        fprintf(stderr, "Failed to get net.\n");
+        exit(EXIT_FAILURE);
+    }
+
     if (pcap_compile(pcap_dest, &fp, filter, 0, net) == -1) {
         fprintf(stderr, "failed to compile the filter %s: %s\n",
                                                 filter, pcap_geterr(pcap_dest));
@@ -350,7 +370,12 @@ parse_cmd(int argc, char **argv)
                 break;
             case 'i':
                 interval = atoi(optarg);
-                fprintf(stdout, "interval: %d\n", interval);
+                if (interval < 0 && interval > 65535)
+                {
+                    fprintf(stderr, "the interval time is invalid\n");
+                    USAGE();
+                    exit(EXIT_FAILURE);
+                }
                 break;
             case 'h':
                 USAGE();

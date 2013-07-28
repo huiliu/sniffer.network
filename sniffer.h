@@ -32,7 +32,7 @@ typedef struct __ip_sum__
     uint64_t    flow_out;
 }ip_traffic;
 
-#define SNAP_LEN                1518
+#define SNAP_LEN                54
 #define OUTPUT_TIME_INTERVAL    60
 #define DEV_NAME_LEN            5
 #define BUFF_LEN                DEV_NAME_LEN
