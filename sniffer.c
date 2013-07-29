@@ -135,10 +135,7 @@ list_walk()
         l++;
     }
 
-    char time_stamp[20];
-
-    time_t t = time(NULL);
-    strftime(time_stamp, OUTPUT_FILE_NAME_LEN, "packet_%Y%m%d%H%M", localtime(&t));
+    time_t time_stamp = time(NULL);
 
     FILE *tmp = NULL;
     tmp = fopen(file_summary_02, "a");
