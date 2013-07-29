@@ -31,11 +31,11 @@ char *o_file_name = NULL;
 char *dev = NULL;
 FILE *fd = NULL;
 uint16_t    interval = 0;
-char file_summary_01[20] = "125.77.254.2";;
-char file_summary_02[20] = "125.77.254.3";;
+char file_summary_02[20] = "125.77.254.2";;
+char file_summary_03[20] = "125.77.254.3";;
 
-char *ip_01 = "125.77.254.2";
 char *ip_02 = "125.77.254.2";
+char *ip_03 = "125.77.254.3";
 
 inline char
 *generate_file_name()
@@ -83,8 +83,8 @@ void
 list_walk()
 {
     ip_traffic ip_traf[2];
-    inet_aton(ip_01, (struct in_addr *)&ip_traf->ip);
-    inet_aton(ip_02, (struct in_addr *)&ip_traf[1].ip);
+    inet_aton(ip_02, (struct in_addr *)&ip_traf->ip);
+    inet_aton(ip_03, (struct in_addr *)&ip_traf[1].ip);
 
     if (fd == NULL)
     {
@@ -93,15 +93,19 @@ list_walk()
     }
 #if defined(__x86_64__)
     char *fmt = "%s %s %d %d %lu %lu %lu\n";
-    char *fmt_sum = "%s %lu %lu %lu %lu\n";
+    char *fmt_sum = "%s %lu %lu %lu %lu %lu\n";
 #else
     char *fmt = "%s %s %d %d %llu %llu %lu\n";
-    char *fmt_sum = "%s %llu %llu %llu %llu\n";
+    char *fmt_sum = "%s %llu %llu %llu %llu %lu\n";
 #endif
 
     char ip_src[16];
     list_node_t *l = packet_list;
     uint32_t i;
+
+    ip_traf->pkt_out = ip_traf->pkt_in = ip_traf->flow_in = ip_traf->flow_out \
+    = ip_traf[1].pkt_out = ip_traf[1].pkt_in = ip_traf[1].flow_in \
+    = ip_traf[1].flow_out = 0;
 
     for (i = 0; i < packet_list_len; i++)
     {
@@ -137,14 +141,14 @@ list_walk()
     strftime(time_stamp, OUTPUT_FILE_NAME_LEN, "packet_%Y%m%d%H%M", localtime(&t));
 
     FILE *tmp = NULL;
-    tmp = fopen(file_summary_01, "a");
+    tmp = fopen(file_summary_02, "a");
     fprintf(tmp, fmt_sum, inet_ntoa(*(struct in_addr *)&ip_traf[0].ip),
                 ip_traf->pkt_in, ip_traf->pkt_out,
                 ip_traf->flow_in, ip_traf->flow_out,
                 time_stamp);
     fclose(tmp);
 
-    tmp = fopen(file_summary_02, "a");
+    tmp = fopen(file_summary_03, "a");
     fprintf(tmp, fmt_sum, inet_ntoa(*(struct in_addr *)&ip_traf[1].ip),
                 ip_traf[1].pkt_in, ip_traf[1].pkt_out,
                 ip_traf[1].flow_in, ip_traf[1].flow_out,
@@ -362,6 +366,7 @@ parse_cmd(int argc, char **argv)
         USAGE();
     }
 
+    int interval_temp;
     while ((opt = getopt(argc, argv, "d:i:h")) != -1) {
         switch (opt) {
             case 'd':
@@ -369,13 +374,14 @@ parse_cmd(int argc, char **argv)
                 strcpy(dev, optarg);
                 break;
             case 'i':
-                interval = atoi(optarg);
-                if (interval < 0 && interval > 65535)
+                interval_temp = atoi(optarg);
+                if (interval_temp < 0 || interval_temp > 1000)
                 {
                     fprintf(stderr, "the interval time is invalid\n");
                     USAGE();
                     exit(EXIT_FAILURE);
                 }
+                interval = interval_temp;
                 break;
             case 'h':
                 USAGE();
